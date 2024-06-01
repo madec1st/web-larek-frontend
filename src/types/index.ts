@@ -13,6 +13,11 @@ export interface IApi {
   request<T>(request: IRequest<T>): Promise<IResponse<T>>;
 }
 
+export interface IProductsServerResponse {
+  total: number;
+  items: ICardData[];
+}
+
 export interface ICardData {
   id?: string;
   description?: string;

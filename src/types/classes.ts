@@ -1,10 +1,16 @@
-import { IRequest, IResponse, IApi, ICardData, IOrder, IBasketOperations, IPaymentForm, IContactsForm, TTotalPrice } from '../types/index'
+import { IRequest, IResponse, IApi, IProductsServerResponse, ICardData, IOrder, IBasketOperations, IPaymentForm, IContactsForm, TTotalPrice } from '../types/index'
+import { API_URL, CDN_URL } from '../utils/constants'
 
-class CardApi implements IApi {
+export class CardApi implements IApi {
+  private baseUrl: string;
+
+  constructor() {
+    this.baseUrl = API_URL;
+  }
+
   request<T>(request: IRequest<T>): Promise<IResponse<T>> {
     return fetch(request.url, {
-      method: 'GET',
-      body: request.data ? JSON.stringify(request.data) : null,
+      method: request.method,
       headers: {
         'Content-Type': 'application/json',
       },
@@ -13,9 +19,26 @@ class CardApi implements IApi {
     .then(data => ({ status: response.status, data })))
     .catch(() => ({ status: 500, data: null }));
   }
+
+  getProducts(): Promise<IResponse<IProductsServerResponse>> {
+    const request: IRequest<null> = {
+      method: 'GET',
+      url: `${this.baseUrl}/product/`,
+      data: null
+    };
+
+    return this.request<IProductsServerResponse>(request)
+      .then(response => {
+        if (response.status === 200 && response.data) {
+          return { status: response.status, data: response.data };
+        } else {
+          return { status: response.status, data: {total: 0, items: []} };
+        }
+    });
+  }
 }
 
-class ClientApi implements IApi {
+export class ClientApi implements IApi {
   request<T>(request: IRequest<T>): Promise<IResponse<T>> {
     return fetch(request.url, {
       method: 'POST',
@@ -30,14 +53,52 @@ class ClientApi implements IApi {
   }
 }
 
-class Card implements ICardData{
+export class Card implements ICardData{
   image: string;
   title: string;
   category: string;
   price: number|null;
+  private card: HTMLElement | null = null;
+
+  constructor(data: ICardData) {
+    this.image = data.image;
+    this.title = data.title;
+    this.category = data.category;
+    this.price = data.price;
+    this.createCard();
+  }
+
+  private createCard(): void {
+    const cardTemplate: HTMLTemplateElement = document.querySelector('#card-catalog');
+    this.card = cardTemplate.content.querySelector('.card').cloneNode(true) as HTMLElement;
+    const cardTitle = this.card.querySelector('.card__title');
+    const cardTag = this.card.querySelector('.card__category');
+    const cardImage = this.card.querySelector('.card__image') as HTMLImageElement;
+    const cardPrice = this.card.querySelector('.card__price');
+
+    cardTitle.textContent = this.title;
+    cardTag.textContent = this.category;
+    cardImage.src = `${CDN_URL}${this.image}`;
+    cardImage.alt = this.title;
+
+    if (typeof this.price === 'number') {
+      cardPrice.textContent = `${this.price} синапсов`
+    } else {
+      cardPrice.textContent = 'Бесценно'
+    }
+    
+  }
+
+  public getCard(): HTMLElement {
+    if (!this.card) {
+      this.createCard();
+    }
+
+    return this.card;
+  }
 }
 
-class CardPopup implements ICardData {
+export class CardPopup implements ICardData {
   description: string;
   image: string;
   title: string;
@@ -58,7 +119,7 @@ class CardPopup implements ICardData {
   }
 }
 
-class Basket implements IOrder, IBasketOperations {
+export class Basket implements IOrder, IBasketOperations {
   items: Pick<ICardData, 'id' | 'title' | 'price'>[] = [];
   totalPrice: number;
 
@@ -109,7 +170,7 @@ class Basket implements IOrder, IBasketOperations {
   }
 }
 
-class PaymentPopup implements IPaymentForm {
+export class PaymentPopup implements IPaymentForm {
   payment: string;
   address: string;
 
@@ -135,7 +196,7 @@ class PaymentPopup implements IPaymentForm {
   }
 }
 
-class ContactsPopup implements IContactsForm {
+export class ContactsPopup implements IContactsForm {
   email: string;
   phone: number;
 
@@ -161,7 +222,7 @@ class ContactsPopup implements IContactsForm {
   }
 }
 
-class SuccessfulOrder implements TTotalPrice {
+export class SuccessfulOrder implements TTotalPrice {
   totalPrice: number;
 
   constructor(totalPrice: number) {
