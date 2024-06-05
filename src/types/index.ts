@@ -28,11 +28,12 @@ export interface ICardData {
 }
 
 export interface IOrder {
-  items: Pick<ICardData, 'id' | 'title' | 'price'>[];
+  items: TBasketItem[];
   totalPrice: number;
 }
 
 export interface IBasketOperations {
+  addToBasket(item: TBasketItem): void;
   calculateTotalPrice(): number;
   deleteItem(id: string): void;
   placeOrder(): void;
@@ -56,8 +57,10 @@ export interface IContactsForm {
   submit(): void;
 }
 
-export type TCardsArray = ICardData[];
+export type TCardsArray = ICardData[];//удалить если не пригодится
 
-export type TClient = IPaymentForm & IContactsForm;
+export type TClient = IPaymentForm & IContactsForm;//удалить если не пригодится
 
 export type TTotalPrice = Pick<IOrder, 'totalPrice'>;
+
+export type TBasketItem = Pick<ICardData, 'id' | 'title' | 'price'>;
