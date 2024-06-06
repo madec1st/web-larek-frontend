@@ -2,7 +2,7 @@
 
 import './scss/styles.scss';
 import { IProductsServerResponse, ICardData } from './types/index'
-import { CardApi,  ClientApi,  Card, CardPopup, Basket, PaymentPopup, ContactsPopup, SuccessfulOrder } from './types/classes';
+import { CardApi,  ClientApi, Popup, Card, CardPopup, Basket, BasketPopup, PaymentPopup, ContactsPopup, SuccessfulOrder } from './types/classes';
 
 const cardsContainer = document.querySelector('.gallery'); // вынести общие константы наверх файла
 const cardApi = new CardApi();
@@ -23,22 +23,28 @@ cardApi.getProducts()
     console.log(`Код ошибки: ${err}`)
   });
 
-
+const basket = new Basket();
+const basketPopup = new BasketPopup(basket);
 cardsContainer.addEventListener('click', handleCardClick);
+const modalCardPreview = document.querySelector('.modal_card-preview');
+
+const basketButton = document.querySelector('.header__basket');
+basketButton.addEventListener('click', basketPopup.openModal)
+
 
 function handleCardClick(evt: MouseEvent): void {
   const clickedElement = evt.target as HTMLElement;
+  const cardElement = clickedElement.closest('.card') as HTMLElement;
+  
 
-  if (clickedElement.classList.contains('gallery__item')) {
-    const cardElement = clickedElement.closest('.card') as HTMLElement;
+  if (cardElement) {
     const cardDataJSON = cardElement.dataset.cardData;
 
     if (cardDataJSON) {
       const cardData: ICardData = JSON.parse(cardDataJSON);
-      // const cardPopup = new CardPopup(cardData, basket); //экземпляр new Basket()
-      // cardPopup.openModal(cardElement);
+      const cardPopup = new CardPopup(cardData, basket); //экземпляр new Basket()
+      cardPopup.openModal();
+      console.log(cardPopup)
     }
   }
 }
-
-

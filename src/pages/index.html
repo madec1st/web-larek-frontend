@@ -39,10 +39,10 @@
 		</div>
 	</div>
 
-	<div class="modal"><!--Попап инфо о товаре-->
+	<div class="modal modal_card-preview"><!--Попап инфо о товаре-->
 		<div class="modal__container">
 			<button class="modal__close" aria-label="закрыть"></button>
-			<div class="modal__content">
+			<div class="modal__content modal__content_card-preview">
 				<div class="card card_full">
 					<img class="card__image" src="<%=require('../images/Subtract.svg')%>" alt="" />
 					<div class="card__column">
@@ -59,10 +59,10 @@
 		</div>
 	</div>
 
-	<div class="modal"><!--Попап корзины. Контейнер-->
+	<div class="modal modal_basket"><!--Попап корзины. Контейнер-->
 		<div class="modal__container">
 			<button class="modal__close" aria-label="закрыть"></button>
-			<div class="modal__content">
+			<div class="modal__content modal__content_basket">
 				<div class="basket">
 					<h2 class="modal__title">Корзина</h2>
 					<ul class="basket__list">
@@ -177,7 +177,7 @@
 		<div class="card card_full">
 			<img class="card__image" src="<%=require('../images/Subtract.svg')%>" alt="" />
 			<div class="card__column">
-				<span class="card__category card__category_other">другое</span>
+				<span class="card__category">другое</span>
 				<h2 class="card__title">Бэкенд-антистресс</h2>
 				<p class="card__text">Если планируете решать задачи в тренажёре, берите два.</p>
 				<div class="card__row">

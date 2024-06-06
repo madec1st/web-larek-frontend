@@ -85,6 +85,59 @@ export class BaseCard implements ICardData {
     } else {
       cardPrice.textContent = 'Бесценно';
     }
+
+    const categoryClasses: Record<string, string> = {
+      'софт-скил': 'card__category_soft',
+      'другое': 'card__category_other',
+      'дополнительное': 'card__category_additional',
+      'кнопка': 'card__category_button',
+      'хард-скил': 'card__category_hard'
+    };
+  
+    const categoryClass = categoryClasses[this.category];
+    if (categoryClass) {
+      cardTag.classList.add(categoryClass);
+    }
+  }
+}
+
+export class Popup {
+  protected savedScrollPosition: number = 0;
+  protected modalElement: HTMLElement;
+  public popup: Popup;
+  public closeButton: HTMLButtonElement;
+
+  constructor(modalSelector: string) {
+    this.modalElement = document.querySelector(modalSelector) as HTMLElement;
+    this.closeButton = this.modalElement.querySelector('.modal__close');
+    this.closeModal = this.closeModal.bind(this)
+    this.closeBySpaceAround = this.closeBySpaceAround.bind(this);
+  }
+ 
+
+  openModal(): void {
+    this.savedScrollPosition = window.scrollY;
+    this.modalElement.classList.add('modal_active');
+    toggleScrollLock(true);
+    this.closeButton.addEventListener('click', this.closeModal);
+    document.addEventListener('click', this.closeBySpaceAround);
+    
+  }
+
+  closeModal(): void {
+    this.modalElement.classList.remove('modal_active');
+    toggleScrollLock(false);
+    window.scrollTo(0, this.savedScrollPosition);
+    this.closeButton.removeEventListener('click', this.closeModal);
+    document.removeEventListener('click', this.closeBySpaceAround);
+  }
+
+  closeBySpaceAround(evt: MouseEvent): void {
+    const target = evt.target as HTMLElement;
+  
+    if (target.classList.contains('modal_active')) {
+      this.closeModal();
+    }
   }
 }
 
@@ -92,6 +145,7 @@ export class Card extends BaseCard {
   constructor(data: ICardData) {
     super(data);
     this.createCard('#card-catalog');
+    
   }
 
   public getCard(): HTMLElement {
@@ -102,25 +156,41 @@ export class Card extends BaseCard {
   }
 }
 
+const modalContentCardPreview = document.querySelector('.modal__content_card-preview');//наверх
+const pageWrapper = document.querySelector('.page__wrapper');//наверх
+
 export class CardPopup extends BaseCard {
   id: string;
   description: string;
   basket: Basket;
+  popup: Popup;
 
   constructor(data: ICardData, basket: Basket) {
     super(data);
+    this.createCard('#card-preview');
     this.id = data.id;
     this.description = data.description;
     this.basket = basket;
-    this.closeBySpaceAround = this.closeBySpaceAround.bind(this);
+    this.popup = new Popup('.modal_card-preview');
+    this.closeModal = this.closeModal.bind(this);
+
+    if (modalContentCardPreview) {
+      while (modalContentCardPreview.firstChild) {
+        modalContentCardPreview.removeChild(modalContentCardPreview.firstChild);
+      }
+      modalContentCardPreview.appendChild(this.cardElement);
+    }
+
+    const cardDescription = this.cardElement.querySelector('.card__text');
+    cardDescription.textContent = this.description;
+    
   }
 
-  openModal(cardElement: HTMLElement): void {
-    cardElement.classList.add('modal_active');
-    document.addEventListener('click', this.closeBySpaceAround);
-
-    const buyButton = cardElement.querySelector('.card__button');
-    buyButton.addEventListener('click', () => {
+  openModal() {
+    this.popup.openModal();
+    const buyButton = this.cardElement.querySelector('.card__button');
+    buyButton.addEventListener('click', (evt) => {
+      evt.stopPropagation();
       this.basket.addToBasket({
         id: this.id,
         title: this.title,
@@ -128,38 +198,33 @@ export class CardPopup extends BaseCard {
       })
     })
   }
-
-  closeModal(cardElement: HTMLElement): void {
-    cardElement.classList.remove('modal_active');
-    document.removeEventListener('click', this.closeBySpaceAround);
-  }
-
-  closeBySpaceAround(evt: MouseEvent): void {
-    const target = evt.target as HTMLElement;
-    const modalActive = document.querySelector('.modal_active') as HTMLElement; // вынести общие константы наверх файла
   
-    if (modalActive && !modalActive.contains(target)) {
-      this.closeModal(modalActive);
-    }
+  closeModal() {
+    this.popup.closeModal()
   }
 }
 
-export class BasketDisplay {
+export class BasketPopup {
   private basket: Basket;
   private basketList: HTMLUListElement;
   private totalPriceElement: HTMLSpanElement;
+  public popup: Popup;
 
   constructor(basket: Basket) {
     this.basket = basket;
+    this.popup = new Popup('.modal_basket');
+    this.openModal = this.openModal.bind(this);
+    this.closeModal = this.closeModal.bind(this);
+
     const basketTemplate = document.querySelector('#basket') as HTMLTemplateElement;
     const basketContainer = basketTemplate.content.cloneNode(true) as HTMLElement;
-    const modalContent = document.querySelector('.modal__content');
+    const modalContentBasket = document.querySelector('.modal__content_basket');
 
-    if (modalContent) {
-      while (modalContent.firstChild) {
-        modalContent.removeChild(modalContent.firstChild);
+    if (modalContentBasket) {
+      while (modalContentBasket.firstChild) {
+        modalContentBasket.removeChild(modalContentBasket.firstChild);
       }
-      modalContent.appendChild(basketContainer);
+      modalContentBasket.appendChild(basketContainer);
     }
 
     this.basketList = document.querySelector('.basket__list') as HTMLUListElement;
@@ -168,15 +233,23 @@ export class BasketDisplay {
     this.initializeBasket();
   }
 
+  openModal() {
+    this.popup.openModal();
+  }
+
+  closeModal() {
+    this.popup.closeModal();
+  }
+
   private initializeBasket(): void {
     this.basket.items.forEach((item, index) => {
-      this.addItemToBasketDisplay(item, index)
+      this.addItemToBasketPopup(item, index)
     })
     this.updateTotalPrice();
   }
 
-  private addItemToBasketDisplay(item: TBasketItem, index: number): void {
-    const cardBasketTemplate = document.querySelector('#card-basket') as HTMLTemplateElement;
+  private addItemToBasketPopup(item: TBasketItem, index: number): void {
+    const cardBasketTemplate = document.querySelector('#card-basket') as HTMLTemplateElement;//наверх
     const cardBasketElement = cardBasketTemplate.content.cloneNode(true) as HTMLElement;
     const cardIndex = cardBasketElement.querySelector('.basket__item-index');
     const cardTitle = cardBasketElement.querySelector('.card__title');
@@ -213,26 +286,13 @@ export class BasketDisplay {
   }
 }
 
-
-// <template id="card-basket"> <!--Попап корзины. Элемент списка-->
-// <li class="basket__item card card_compact">
-//   <span class="basket__item-index">1</span>
-//   <span class="card__title">Фреймворк куки судьбы</span>
-//   <span class="card__price">2500 синапсов</span>
-//   <button class="basket__item-delete card__button" aria-label="удалить"></button>
-// </li>
-// </template>
-
-// <template id="basket"> <!--Попап корзины. Контейнер-->
-// <div class="basket">
-//   <h2 class="modal__title">Корзина</h2>
-//   <ul class="basket__list"></ul>
-//   <div class="modal__actions">
-//     <button class="button basket__button">Оформить</button>
-//     <span class="basket__price">0 синапсов</span>
-//   </div>
-// </div>
-// </template>
+export function toggleScrollLock(isLocked: boolean): void {
+  if (isLocked) {
+    pageWrapper.classList.add('page__wrapper_locked');
+  } else {
+    pageWrapper.classList.remove('page__wrapper_locked');
+  }
+}
 
 export class Basket implements IOrder, IBasketOperations {
   items: TBasketItem[] = [];
