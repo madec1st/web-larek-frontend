@@ -163,6 +163,8 @@ export class CardPopup extends BaseCard {
   id: string;
   description: string;
   basket: Basket;
+  basketIcon: BasketIcon;
+  basketUI: BasketUI;
   popup: Popup;
 
   constructor(data: ICardData, basket: Basket) {
@@ -171,6 +173,8 @@ export class CardPopup extends BaseCard {
     this.id = data.id;
     this.description = data.description;
     this.basket = basket;
+    this.basketIcon = new BasketIcon(basket);
+    this.basketUI = new BasketUI(basket);
     this.popup = new Popup('.modal_card-preview');
     this.closeModal = this.closeModal.bind(this);
 
@@ -188,14 +192,37 @@ export class CardPopup extends BaseCard {
 
   openModal() {
     this.popup.openModal();
-    const buyButton = this.cardElement.querySelector('.card__button');
+    const item = {
+      id: this.id,
+      title: this.title,
+      price: this.price
+    }
+
+    const buyButton = this.cardElement.querySelector('.card__button') as HTMLButtonElement;
+    let isInBasket = this.basket.items.some(item => item.id === this.id);
+
+    function updateStateItem() {
+      buyButton.textContent = isInBasket ? 'Убрать' : 'Купить';
+    }
+    
+    updateStateItem();
+    
     buyButton.addEventListener('click', (evt) => {
       evt.stopPropagation();
-      this.basket.addToBasket({
-        id: this.id,
-        title: this.title,
-        price: this.price
-      })
+      isInBasket = !isInBasket;
+
+      if (isInBasket) {
+        this.basketIcon.addToBasket(item);
+        this.basketUI.updateBasketPopup();
+        this.basketUI.updateOrderButtonState();
+        buyButton.textContent = 'Убрать';
+      } else {
+        this.basketIcon.deleteFromBasket(item);
+        this.basketUI.updateBasketPopup();
+        this.basketUI.updateOrderButtonState();
+        buyButton.textContent = 'Купить';
+      }
+      updateStateItem();
     })
   }
   
@@ -205,13 +232,11 @@ export class CardPopup extends BaseCard {
 }
 
 export class BasketPopup {
-  private basket: Basket;
-  private basketList: HTMLUListElement;
-  private totalPriceElement: HTMLSpanElement;
   public popup: Popup;
+  private basketUI: BasketUI;
 
   constructor(basket: Basket) {
-    this.basket = basket;
+    this.basketUI = new BasketUI(basket);
     this.popup = new Popup('.modal_basket');
     this.openModal = this.openModal.bind(this);
     this.closeModal = this.closeModal.bind(this);
@@ -227,9 +252,6 @@ export class BasketPopup {
       modalContentBasket.appendChild(basketContainer);
     }
 
-    this.basketList = document.querySelector('.basket__list') as HTMLUListElement;
-    this.totalPriceElement = document.querySelector('.basket__price') as HTMLSpanElement;
-
     this.initializeBasket();
   }
 
@@ -242,47 +264,7 @@ export class BasketPopup {
   }
 
   private initializeBasket(): void {
-    this.basket.items.forEach((item, index) => {
-      this.addItemToBasketPopup(item, index)
-    })
-    this.updateTotalPrice();
-  }
-
-  private addItemToBasketPopup(item: TBasketItem, index: number): void {
-    const cardBasketTemplate = document.querySelector('#card-basket') as HTMLTemplateElement;//наверх
-    const cardBasketElement = cardBasketTemplate.content.cloneNode(true) as HTMLElement;
-    const cardIndex = cardBasketElement.querySelector('.basket__item-index');
-    const cardTitle = cardBasketElement.querySelector('.card__title');
-    const cardPrice = cardBasketElement.querySelector('.card__price');
-
-    cardIndex.textContent = (index + 1).toString();
-    cardTitle.textContent = item.title;
-
-    if (typeof item.price === 'number') {
-      cardPrice.textContent = `${item.price} синапсов`;
-    } else {
-      cardPrice.textContent = 'Бесценно';
-    }
-
-    const deleteButton = cardBasketElement.querySelector('.basket__item-delete') as HTMLButtonElement;
-    deleteButton.addEventListener('click', () => {
-      this.basket.deleteItem(item.id);
-      this.removeItemFromBasketDisplay(index);
-    });
-
-    this.basketList.appendChild(cardBasketElement);
-  }
-
-  private removeItemFromBasketDisplay(index: number): void {
-    const basketItems = this.basketList.querySelectorAll('.basket__item');
-    if (basketItems[index]) {
-      basketItems[index].remove();
-    }
-    this.updateTotalPrice();
-  }
-
-  updateTotalPrice(): void {
-    this.totalPriceElement.textContent = `${this.basket.totalPrice} синапсов`;
+    this.basketUI.updateBasketPopup();
   }
 }
 
@@ -292,6 +274,108 @@ export function toggleScrollLock(isLocked: boolean): void {
   } else {
     pageWrapper.classList.remove('page__wrapper_locked');
   }
+}
+
+export class BasketUI {
+  private basket: Basket;
+  private basketList: HTMLUListElement;
+  private popup: Popup;
+  private totalPriceElement: HTMLSpanElement;
+  private basketIcon: BasketIcon;
+  orderButton: HTMLButtonElement;
+
+  constructor(basket: Basket) {
+    this.basket = basket;
+    this.basketList = document.querySelector('.basket__list') as HTMLUListElement;
+    this.totalPriceElement = document.querySelector('.basket__price') as HTMLSpanElement;
+    this.orderButton = document.querySelector('.basket__button') as HTMLButtonElement;
+    this.basketIcon = new BasketIcon(basket);
+    this.popup = new Popup('.modal_basket');
+  }
+  
+  updateOrderButtonState() {
+    console.log(this.orderButton)
+    if (this.basket.items.length === 0) {
+      this.orderButton.setAttribute('disabled', 'true');
+    } else {
+      this.orderButton.removeAttribute('disabled')
+    }
+  }
+  
+  updateBasketPopup(): void {
+    this.clearBasketList();
+    this.basket.items.forEach((item) => {
+      this.addItemToBasketPopup(item);
+    });
+    this.updateTotalPrice();
+    this.updateOrderButtonState();
+  }
+
+  private clearBasketList(): void {
+    while (this.basketList.firstChild) {
+      this.basketList.removeChild(this.basketList.firstChild);
+    }
+  }
+  
+  private updateItemIndexes(): void {
+    const basketItems = document.querySelectorAll('.basket__item');
+    basketItems.forEach((item, index) => {
+      const itemIndex = item.querySelector('.basket__item-index');
+      itemIndex.textContent = (index + 1).toString();
+    });
+  }
+
+  private addItemToBasketPopup(item: TBasketItem): void {
+    const cardBasketTemplate = document.querySelector('#card-basket') as HTMLTemplateElement;//наверх
+    const cardBasketElement = cardBasketTemplate.content.querySelector('.basket__item').cloneNode(true) as HTMLElement;
+    const cardTitle = cardBasketElement.querySelector('.card__title');
+    const cardPrice = cardBasketElement.querySelector('.card__price');
+
+    cardBasketElement.setAttribute('data-id', item.id);
+    cardTitle.textContent = item.title;
+    
+    
+    if (typeof item.price === 'number') {
+      cardPrice.textContent = `${item.price} синапсов`;
+    } else {
+      cardPrice.textContent = 'Бесценно';
+    }
+
+    const deleteButton = cardBasketElement.querySelector('.basket__item-delete') as HTMLButtonElement;
+    deleteButton.addEventListener('click', () => {
+      this.basketIcon.deleteFromBasket(item);
+      this.removeItemFromBasketPopup(item.id);
+    });
+
+    this.basketList.appendChild(cardBasketElement);
+    this.updateItemIndexes();
+    this.updateOrderButtonState();
+  }
+
+  private removeItemFromBasketPopup(itemID: string): void {
+    const basketItems = document.querySelectorAll('.basket__item');
+    basketItems.forEach((item) => {
+      if (item.getAttribute('data-id') === itemID) {
+        item.remove();
+      }
+    });
+    this.updateTotalPrice();
+    this.updateItemIndexes();
+    this.updateOrderButtonState();
+  }
+
+  private updateTotalPrice(): void {
+    this.totalPriceElement.textContent = `${this.basket.totalPrice} синапсов`;
+  }
+
+  makeOrder() {
+    this.orderButton.addEventListener('click', () => {
+      this.basket.placeOrder();
+      
+      this.popup.closeModal;
+    })
+  }
+  
 }
 
 export class Basket implements IOrder, IBasketOperations {
@@ -305,7 +389,9 @@ export class Basket implements IOrder, IBasketOperations {
   addToBasket(item: TBasketItem): void {
     this.items.push(item);
     this.calculateTotalPrice();
+
     console.log(`${item.title} добавлен в корзину`);
+    console.log(this.items)
   }
 
   calculateTotalPrice(): number {
@@ -335,6 +421,7 @@ export class Basket implements IOrder, IBasketOperations {
       this.totalPrice = updatedTotalPrice;
 
       console.log(`Товар "${removedItem.title}" удалён из корзины`);
+      console.log(this.items);
     }
   }
 
@@ -352,6 +439,33 @@ export class Basket implements IOrder, IBasketOperations {
     console.log(`Ваш заказ успешно оформлен: ${order}`);
     this.items = [];
     this.totalPrice = 0;
+  }
+}
+
+class BasketIcon {
+  private basket: Basket
+  private counter: HTMLSpanElement;
+
+  constructor(basket: Basket) {
+    this.basket = basket;
+    this.counter = document.querySelector('.header__basket-counter') as HTMLSpanElement;
+
+    this.updateCounter();
+  }
+
+  updateCounter(): void {
+    const currentCounter = this.basket.items.length;
+    this.counter.textContent = currentCounter.toString();
+  }
+
+  addToBasket(item: TBasketItem) {
+    this.basket.addToBasket(item);
+    this.updateCounter();
+  }
+
+  deleteFromBasket(item: TBasketItem) {
+    this.basket.deleteItem(item.id);
+    this.updateCounter();
   }
 }
 

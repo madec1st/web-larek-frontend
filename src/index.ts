@@ -2,7 +2,7 @@
 
 import './scss/styles.scss';
 import { IProductsServerResponse, ICardData } from './types/index'
-import { CardApi,  ClientApi, Popup, Card, CardPopup, Basket, BasketPopup, PaymentPopup, ContactsPopup, SuccessfulOrder } from './types/classes';
+import { CardApi,  ClientApi, Popup, Card, CardPopup, Basket, BasketUI, BasketPopup, PaymentPopup, ContactsPopup, SuccessfulOrder } from './types/classes';
 
 const cardsContainer = document.querySelector('.gallery'); // вынести общие константы наверх файла
 const cardApi = new CardApi();
@@ -25,8 +25,9 @@ cardApi.getProducts()
 
 const basket = new Basket();
 const basketPopup = new BasketPopup(basket);
+const basketUI = new BasketUI(basket);
+basketUI.updateOrderButtonState();
 cardsContainer.addEventListener('click', handleCardClick);
-const modalCardPreview = document.querySelector('.modal_card-preview');
 
 const basketButton = document.querySelector('.header__basket');
 basketButton.addEventListener('click', basketPopup.openModal)
@@ -42,9 +43,8 @@ function handleCardClick(evt: MouseEvent): void {
 
     if (cardDataJSON) {
       const cardData: ICardData = JSON.parse(cardDataJSON);
-      const cardPopup = new CardPopup(cardData, basket); //экземпляр new Basket()
+      const cardPopup = new CardPopup(cardData, basket);
       cardPopup.openModal();
-      console.log(cardPopup)
     }
   }
 }
