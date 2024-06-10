@@ -156,14 +156,13 @@ export class Card extends BaseCard {
   }
 }
 
-const modalContentCardPreview = document.querySelector('.modal__content_card-preview');//наверх
+const modalContentCardPreview = document.querySelector('.modal__content_card-preview') as HTMLElement;//наверх
 const pageWrapper = document.querySelector('.page__wrapper');//наверх
 
 export class CardPopup extends BaseCard {
   id: string;
   description: string;
   basket: Basket;
-  basketIcon: BasketIcon;
   basketUI: BasketUI;
   popup: Popup;
 
@@ -173,17 +172,11 @@ export class CardPopup extends BaseCard {
     this.id = data.id;
     this.description = data.description;
     this.basket = basket;
-    this.basketIcon = new BasketIcon(basket);
     this.basketUI = new BasketUI(basket);
     this.popup = new Popup('.modal_card-preview');
     this.closeModal = this.closeModal.bind(this);
 
-    if (modalContentCardPreview) {
-      while (modalContentCardPreview.firstChild) {
-        modalContentCardPreview.removeChild(modalContentCardPreview.firstChild);
-      }
-      modalContentCardPreview.appendChild(this.cardElement);
-    }
+    pasteContent(modalContentCardPreview, this.cardElement);
 
     const cardDescription = this.cardElement.querySelector('.card__text');
     cardDescription.textContent = this.description;
@@ -212,12 +205,12 @@ export class CardPopup extends BaseCard {
       isInBasket = !isInBasket;
 
       if (isInBasket) {
-        this.basketIcon.addToBasket(item);
+        this.basket.addToBasket(item);
         this.basketUI.updateBasketPopup();
         this.basketUI.updateOrderButtonState();
         buyButton.textContent = 'Убрать';
       } else {
-        this.basketIcon.deleteFromBasket(item);
+        this.basket.deleteItem(item.id);
         this.basketUI.updateBasketPopup();
         this.basketUI.updateOrderButtonState();
         buyButton.textContent = 'Купить';
@@ -233,26 +226,22 @@ export class CardPopup extends BaseCard {
 
 export class BasketPopup {
   public popup: Popup;
+  basket: Basket;
   private basketUI: BasketUI;
 
   constructor(basket: Basket) {
     this.basketUI = new BasketUI(basket);
+    this.basket = basket;
     this.popup = new Popup('.modal_basket');
     this.openModal = this.openModal.bind(this);
     this.closeModal = this.closeModal.bind(this);
 
     const basketTemplate = document.querySelector('#basket') as HTMLTemplateElement;
     const basketContainer = basketTemplate.content.cloneNode(true) as HTMLElement;
-    const modalContentBasket = document.querySelector('.modal__content_basket');
+    const modalContentBasket = document.querySelector('.modal__content_basket') as HTMLElement;//
 
-    if (modalContentBasket) {
-      while (modalContentBasket.firstChild) {
-        modalContentBasket.removeChild(modalContentBasket.firstChild);
-      }
-      modalContentBasket.appendChild(basketContainer);
-    }
-
-    this.initializeBasket();
+    pasteContent(modalContentBasket, basketContainer);
+    this.basketUI.updateBasketPopup();
   }
 
   openModal() {
@@ -261,10 +250,6 @@ export class BasketPopup {
 
   closeModal() {
     this.popup.closeModal();
-  }
-
-  private initializeBasket(): void {
-    this.basketUI.updateBasketPopup();
   }
 }
 
@@ -276,13 +261,22 @@ export function toggleScrollLock(isLocked: boolean): void {
   }
 }
 
+export function pasteContent(modalContent: HTMLElement, clonedElement: HTMLElement) {
+  if (modalContent) {
+    while (modalContent.firstChild) {
+      modalContent.removeChild(modalContent.firstChild);
+  }
+  modalContent.appendChild(clonedElement);
+  }
+}
+
 export class BasketUI {
   private basket: Basket;
   private basketList: HTMLUListElement;
   private popup: Popup;
   private totalPriceElement: HTMLSpanElement;
   private basketIcon: BasketIcon;
-  orderButton: HTMLButtonElement;
+  private orderButton: HTMLButtonElement;
 
   constructor(basket: Basket) {
     this.basket = basket;
@@ -291,10 +285,11 @@ export class BasketUI {
     this.orderButton = document.querySelector('.basket__button') as HTMLButtonElement;
     this.basketIcon = new BasketIcon(basket);
     this.popup = new Popup('.modal_basket');
+
+    this.makeOrder();
   }
   
   updateOrderButtonState() {
-    console.log(this.orderButton)
     if (this.basket.items.length === 0) {
       this.orderButton.setAttribute('disabled', 'true');
     } else {
@@ -308,6 +303,7 @@ export class BasketUI {
       this.addItemToBasketPopup(item);
     });
     this.updateTotalPrice();
+    this.basketIcon.updateCounter();
     this.updateOrderButtonState();
   }
 
@@ -343,7 +339,7 @@ export class BasketUI {
 
     const deleteButton = cardBasketElement.querySelector('.basket__item-delete') as HTMLButtonElement;
     deleteButton.addEventListener('click', () => {
-      this.basketIcon.deleteFromBasket(item);
+      this.basket.deleteItem(item.id);
       this.removeItemFromBasketPopup(item.id);
     });
 
@@ -361,6 +357,7 @@ export class BasketUI {
     });
     this.updateTotalPrice();
     this.updateItemIndexes();
+    this.updateBasketPopup();
     this.updateOrderButtonState();
   }
 
@@ -369,10 +366,10 @@ export class BasketUI {
   }
 
   makeOrder() {
+    const paymentPopup = new PaymentPopup();
     this.orderButton.addEventListener('click', () => {
-      this.basket.placeOrder();
-      
-      this.popup.closeModal;
+      this.popup.closeModal();
+      paymentPopup.openModal();
     })
   }
   
@@ -391,7 +388,7 @@ export class Basket implements IOrder, IBasketOperations {
     this.calculateTotalPrice();
 
     console.log(`${item.title} добавлен в корзину`);
-    console.log(this.items)
+    console.log(this.totalPrice)
   }
 
   calculateTotalPrice(): number {
@@ -400,8 +397,7 @@ export class Basket implements IOrder, IBasketOperations {
       total += item.price || 0; 
     }
 
-    this.totalPrice = total;
-    return total;
+    return this.totalPrice = total;
   }
 
   deleteItem(id: string): void {
@@ -425,18 +421,7 @@ export class Basket implements IOrder, IBasketOperations {
     }
   }
 
-  placeOrder(): void {
-    if (this.items.length === 0) {
-      console.log('Корзина пуста. Оформить заказ невозможно');
-      return;
-    }
-
-    const order: IOrder = {
-      items: this.items,
-      totalPrice: this.totalPrice,
-    }
-
-    console.log(`Ваш заказ успешно оформлен: ${order}`);
+  clearOrder(): void {
     this.items = [];
     this.totalPrice = 0;
   }
@@ -457,19 +442,9 @@ class BasketIcon {
     const currentCounter = this.basket.items.length;
     this.counter.textContent = currentCounter.toString();
   }
-
-  addToBasket(item: TBasketItem) {
-    this.basket.addToBasket(item);
-    this.updateCounter();
-  }
-
-  deleteFromBasket(item: TBasketItem) {
-    this.basket.deleteItem(item.id);
-    this.updateCounter();
-  }
 }
 
-export class PaymentPopup implements IPaymentForm {
+export class Payment implements IPaymentForm {
   payment: string;
   address: string;
 
@@ -482,8 +457,8 @@ export class PaymentPopup implements IPaymentForm {
     this.payment = method;
   }
 
-  enterAddress(inputAddress: string) {
-    this.address = inputAddress;
+  enterAddress(inputAddress: HTMLInputElement) {
+    this.address = inputAddress.value;
   }
 
   submit() {
@@ -495,7 +470,240 @@ export class PaymentPopup implements IPaymentForm {
   }
 }
 
-export class ContactsPopup implements IContactsForm {
+export class PaymentPopup {
+  private popup: Popup;
+  private payment: Payment;
+  private onlineButton: HTMLButtonElement;
+  private onDeliveryButton: HTMLButtonElement;
+  private addressInput: HTMLInputElement;
+  private errorElement: HTMLSpanElement;
+  private validation: Validation
+  private nextButton: HTMLButtonElement;
+
+  constructor() {
+    const formPaymentTemplate = document.querySelector('#order') as HTMLTemplateElement;//наверх
+    const formElement = formPaymentTemplate.content.querySelector('.form').cloneNode(true) as HTMLElement;
+    const modalContentPayment = document.querySelector('.modal__content_payment') as HTMLElement;
+    const onlineButton = formElement.querySelector('.button_alt-online') as HTMLButtonElement;
+    const onDeliveryButton = formElement.querySelector('.button_alt-on-delivery') as HTMLButtonElement;
+    const addressInput = formElement.querySelector('.form__input') as HTMLInputElement;
+    const errorElement = formElement.querySelector('.address-input_error-message') as HTMLSpanElement;
+    const nextButton = formElement.querySelector('.order__button') as HTMLButtonElement;
+
+    this.payment = new Payment();
+    this.popup = new Popup('.modal_payment');
+    this.onlineButton = onlineButton;
+    this.onDeliveryButton = onDeliveryButton;
+    this.addressInput = addressInput;
+    this.errorElement = errorElement;
+    this.validation = new Validation(this.addressInput, this.errorElement);
+    this.nextButton = nextButton;
+
+    console.log(onlineButton)
+
+    this.openModal = this.openModal.bind(this);
+    this.closeModal = this.closeModal.bind(this);
+    this.handleOnlineClick = this.handleOnlineClick.bind(this);
+    this.handleOnDeliveryClick = this.handleOnDeliveryClick.bind(this);
+    this.checkInputValidity = this.checkInputValidity.bind(this);
+
+    pasteContent(modalContentPayment, formElement);
+
+    this.onlineButton.addEventListener('click', () => {
+      this.handleOnlineClick();
+      this.checkValidation();
+    });
+    
+    this.onDeliveryButton.addEventListener('click', () => {
+      this.handleOnDeliveryClick();
+      this.checkValidation();
+    });
+
+    this.addressInput.addEventListener('input', () => {
+      this.checkInputValidity();
+      this.checkValidation();
+    });
+
+    this.nextButton.addEventListener('click', (evt) => {
+      evt.preventDefault();
+      this.submit();
+    })
+  }
+
+  openModal() {
+    this.popup.openModal();
+  }
+
+  closeModal() {
+    this.popup.closeModal();
+  }
+
+  selectPaymentMethod(button: HTMLButtonElement, method: 'online' | 'onDelivery') {
+    if (button.classList.contains('button_alt-active')) {
+      return
+    }
+
+    this.onlineButton.classList.remove('button_alt-active');
+    this.onDeliveryButton.classList.remove('button_alt-active');
+
+    button.classList.add('button_alt-active');
+    this.payment.selectPaymentMethod(method);
+  }  
+
+  handleOnlineClick() {
+    this.selectPaymentMethod(this.onlineButton, 'online');
+  }
+
+  handleOnDeliveryClick() {
+    this.selectPaymentMethod(this.onDeliveryButton, 'onDelivery');
+  }
+
+  checkInputValidity() {
+    this.validation.checkValidation(this.addressInput);
+    this.payment.enterAddress(this.addressInput);
+  }
+
+  isActive(button: HTMLButtonElement) {
+    if (button.classList.contains('button_alt-active')) {
+      return true
+    } else return false
+  }
+
+  checkValidation() {
+    const buttonIsActive = this.isActive(this.onlineButton) || this.isActive(this.onDeliveryButton);
+    const inputIsValid = this.validation.checkValidation(this.addressInput);
+
+    if (inputIsValid && buttonIsActive) {
+      this.nextButton.removeAttribute('disabled');
+    } else {
+      console.log(this.addressInput.validity.valid, buttonIsActive)
+      this.nextButton.setAttribute('disabled', 'true');
+    }
+  }
+
+  submit() {
+    const contactsPopup = new ContactsPopup();
+    this.popup.closeModal();
+    contactsPopup.openModal();
+  }
+}
+
+class Validation {
+  inputElement: HTMLInputElement;
+  errorElement: HTMLSpanElement;
+
+  constructor(inputElement: HTMLInputElement, errorElement: HTMLSpanElement) {
+    this.inputElement = inputElement;
+    this.errorElement = errorElement;
+  }
+
+  checkValidation(inputElement: HTMLInputElement): boolean {
+    if (inputElement.value.trim() === '') {
+      this.showErrorMessage();
+      return false
+    } else if (inputElement.validity.typeMismatch) {
+      this.showErrorMessage();
+      return false
+    } else {
+      this.hideErrorMessage();
+      return true
+    }
+  }
+
+  showErrorMessage() {
+    if (this.inputElement.value.trim() === '') {
+      this.inputElement.setCustomValidity(this.inputElement.dataset.errorMessage);
+      this.errorElement.textContent = this.inputElement.validationMessage;
+    } else if (this.inputElement.validity.typeMismatch) {
+      this.errorElement.textContent = this.inputElement.validationMessage;
+    }
+  }
+
+  hideErrorMessage() {
+    this.inputElement.setCustomValidity('');
+    this.errorElement.textContent = '';
+  }
+}
+
+export class ContactsPopup {
+  private popup: Popup;
+  private contacts: Contacts;
+  private emailInput: HTMLInputElement;
+  private phoneInput: HTMLInputElement;
+  private email: string;
+  private phone: number;
+  private validationEmail: Validation;
+  private validationPhone: Validation;
+  private submitButton: HTMLButtonElement;
+
+  constructor() {
+    const formContactsTemplate = document.querySelector('#contacts') as HTMLTemplateElement;//наверх
+    const formElement = formContactsTemplate.content.querySelector('.form').cloneNode(true) as HTMLElement;
+    const modalContentContacts = document.querySelector('.modal__content_contacts') as HTMLElement;
+    const emailInput = formElement.querySelector('.form__input-email') as HTMLInputElement;
+    const emailErrorElement = formElement.querySelector('.email-input_error-message') as HTMLSpanElement;
+    const phoneInput = formElement.querySelector('.form__input-phone') as HTMLInputElement;
+    const phoneErrorElement = formElement.querySelector('.phone-input_error-message') as HTMLSpanElement;
+    const submitButton = formElement.querySelector('.button_submit') as HTMLButtonElement;
+
+    this.popup = new Popup('.modal_contacts');
+    this.emailInput = emailInput;
+    this.phoneInput = phoneInput;
+    this.submitButton = submitButton;
+    this.contacts = new Contacts(this.email, this.phone);
+    this.validationEmail = new Validation(emailInput, emailErrorElement);
+    this.validationPhone = new Validation(phoneInput, phoneErrorElement);
+
+
+    this.openModal = this.openModal.bind(this);
+    this.closeModal = this.closeModal.bind(this);
+    this.checkValidation = this.checkValidation.bind(this);
+
+    pasteContent(modalContentContacts, formElement);
+
+    this.emailInput.addEventListener('input', () => {
+      this.checkValidation();
+      this.email = this.emailInput.value;
+      this.contacts.email = this.email;
+    });
+
+    this.phoneInput.addEventListener('input', () => {
+      this.checkValidation();
+      this.phone = parseInt(this.phoneInput.value);
+      this.contacts.phone = this.phone;
+    });
+
+    this.submitButton.addEventListener('click', (evt) => {
+      evt.preventDefault();
+      this.submit();
+    })
+    
+  }
+
+  openModal() {
+    this.popup.openModal();
+  }
+
+  closeModal() {
+    this.popup.closeModal();
+  }
+
+  checkValidation() {
+    if (this.validationEmail.checkValidation(this.emailInput) && this.validationPhone.checkValidation(this.phoneInput)) {
+      this.submitButton.removeAttribute('disabled');
+    } else {
+      this.submitButton.setAttribute('disabled', 'true')
+    }
+  }
+
+  submit() {
+    const successfulOrderPopup = new SuccessfulOrderPopup();
+    this.popup.closeModal();
+    successfulOrderPopup.openModal();
+  }
+}
+
+export class Contacts implements IContactsForm {
   email: string;
   phone: number;
 
@@ -521,10 +729,60 @@ export class ContactsPopup implements IContactsForm {
   }
 }
 
-export class SuccessfulOrder implements TTotalPrice {
-  totalPrice: number;
+export class SuccessfulOrderPopup {
+  successfulOrder: SuccessfulOrder;
+  basket: Basket;
+  homeButton: HTMLButtonElement;
+  notificationElement: HTMLParagraphElement
+  popup: Popup;
 
-  constructor(totalPrice: number) {
-    this.totalPrice = totalPrice;
+  constructor() {
+    const successPopupTemplate = document.querySelector('#success') as HTMLTemplateElement;//наверх
+    const successPopup = successPopupTemplate.content.querySelector('.order-success').cloneNode(true) as HTMLElement;
+    const modalContentSuccessfulOrder = document.querySelector('.modal__content_success') as HTMLElement;
+    const spentTokensNotification = successPopup.querySelector('.order-success__description') as HTMLParagraphElement;
+    const homeButton = successPopup.querySelector('.order-success__close') as HTMLButtonElement;
+  
+    this.popup = new Popup('.modal_success');
+    this.basket = basket;
+    this.successfulOrder = new SuccessfulOrder(this.basket);
+    this.notificationElement = spentTokensNotification;
+    this.homeButton = homeButton;
+
+    pasteContent(modalContentSuccessfulOrder, successPopup);
+    
+    this.openModal = this.openModal.bind(this);
+    this.closeModal = this.closeModal.bind(this);
+    this.returnToHomeScreen = this.returnToHomeScreen.bind(this);
+
+    this.notificationElement.textContent = `Списано ${this.successfulOrder.totalPrice} синапсов`
+
+    this.homeButton.addEventListener('click', this.returnToHomeScreen);
+  }
+
+  openModal() {
+    this.popup.openModal();
+  }
+
+  closeModal() {
+    this.popup.closeModal();
+  }
+
+  returnToHomeScreen() {
+    this.basket.clearOrder();
+    this.closeModal();
+    window.location.reload();
   }
 }
+
+export class SuccessfulOrder implements TTotalPrice {
+  totalPrice: number;
+  basket: Basket;
+
+  constructor(basket: Basket) {
+    this.basket = basket;
+    this.totalPrice = this.basket.totalPrice;
+  }
+}
+
+export const basket = new Basket();

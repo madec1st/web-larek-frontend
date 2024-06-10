@@ -36,7 +36,7 @@ export interface IBasketOperations {
   addToBasket(item: TBasketItem): void;
   calculateTotalPrice(): number;
   deleteItem(id: string): void;
-  placeOrder(): void;
+  clearOrder(): void;
 }
 
 export interface IPaymentForm {
@@ -44,7 +44,7 @@ export interface IPaymentForm {
   address: string;
 
   selectPaymentMethod(method: 'online' | 'onDelivery'): void;
-  enterAddress(inputAddress: string): void;
+  enterAddress(inputAddress: HTMLInputElement): void;
   submit(): void;
 }
 

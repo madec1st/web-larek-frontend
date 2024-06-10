@@ -2,7 +2,7 @@
 
 import './scss/styles.scss';
 import { IProductsServerResponse, ICardData } from './types/index'
-import { CardApi,  ClientApi, Popup, Card, CardPopup, Basket, BasketUI, BasketPopup, PaymentPopup, ContactsPopup, SuccessfulOrder } from './types/classes';
+import { basket, CardApi,  ClientApi, Popup, Card, CardPopup, Basket, BasketUI, BasketPopup, PaymentPopup, Contacts, SuccessfulOrder } from './types/classes';
 
 const cardsContainer = document.querySelector('.gallery'); // вынести общие константы наверх файла
 const cardApi = new CardApi();
@@ -23,7 +23,6 @@ cardApi.getProducts()
     console.log(`Код ошибки: ${err}`)
   });
 
-const basket = new Basket();
 const basketPopup = new BasketPopup(basket);
 const basketUI = new BasketUI(basket);
 basketUI.updateOrderButtonState();
@@ -48,3 +47,5 @@ function handleCardClick(evt: MouseEvent): void {
     }
   }
 }
+
+basketUI.updateBasketPopup();
