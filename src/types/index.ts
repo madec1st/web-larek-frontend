@@ -45,21 +45,24 @@ export interface IPaymentForm {
 
   selectPaymentMethod(method: 'online' | 'onDelivery'): void;
   enterAddress(inputAddress: HTMLInputElement): void;
-  submit(): void;
 }
 
 export interface IContactsForm {
   email: string;
   phone: number;
   
-  enterEmail(inputEmail: string): void;
-  enterPhone(inputPhone: number): void;
-  submit(): void;
+  enterEmail(inputEmail: HTMLInputElement): void;
+  enterPhone(inputPhone: HTMLInputElement): void;
 }
 
-export type TCardsArray = ICardData[];//удалить если не пригодится
-
-export type TClient = IPaymentForm & IContactsForm;//удалить если не пригодится
+export interface IOrderData {
+  total: number;
+  items: string[];
+  payment: string;
+  address: string;
+  email: string;
+  phone: number;
+}
 
 export type TTotalPrice = Pick<IOrder, 'totalPrice'>;
 

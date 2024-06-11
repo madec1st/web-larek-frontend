@@ -1,15 +1,13 @@
-// require('dotenv').config();
-
 import './scss/styles.scss';
-import { IProductsServerResponse, ICardData } from './types/index'
-import { basket, CardApi,  ClientApi, Popup, Card, CardPopup, Basket, BasketUI, BasketPopup, PaymentPopup, Contacts, SuccessfulOrder } from './types/classes';
+import { ICardData } from './types/index'
+import { basketData, CardApi, Card, CardPopup, BasketPopup} from './types/classes';
+import { cardsContainer, basketButton } from './utils/constants';
 
-const cardsContainer = document.querySelector('.gallery'); // вынести общие константы наверх файла
 const cardApi = new CardApi();
+const basketPopup = new BasketPopup(basketData);
 
 cardApi.getProducts()
   .then(res => {
-    console.log(res.data);//убрать при отправке на проверку
     if (res.data && res.data.items) {
       res.data.items.forEach((cardData) => {
         const card = new Card(cardData);
@@ -17,18 +15,14 @@ cardApi.getProducts()
         cardsContainer.appendChild(card.getCard());
       })
     }
-    
   })
   .catch(err => {
     console.log(`Код ошибки: ${err}`)
   });
 
-const basketPopup = new BasketPopup(basket);
-const basketUI = new BasketUI(basket);
-basketUI.updateOrderButtonState();
-cardsContainer.addEventListener('click', handleCardClick);
 
-const basketButton = document.querySelector('.header__basket');
+basketPopup.updateOrderButtonState();
+cardsContainer.addEventListener('click', handleCardClick);
 basketButton.addEventListener('click', basketPopup.openModal)
 
 
@@ -36,16 +30,13 @@ function handleCardClick(evt: MouseEvent): void {
   const clickedElement = evt.target as HTMLElement;
   const cardElement = clickedElement.closest('.card') as HTMLElement;
   
-
   if (cardElement) {
     const cardDataJSON = cardElement.dataset.cardData;
 
     if (cardDataJSON) {
       const cardData: ICardData = JSON.parse(cardDataJSON);
-      const cardPopup = new CardPopup(cardData, basket);
+      const cardPopup = new CardPopup(cardData, basketData);
       cardPopup.openModal();
     }
   }
 }
-
-basketUI.updateBasketPopup();

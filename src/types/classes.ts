@@ -1,5 +1,8 @@
-import { IRequest, IResponse, IApi, IProductsServerResponse, ICardData, IOrder, IBasketOperations, IPaymentForm, IContactsForm, TTotalPrice, TBasketItem } from '../types/index'
-import { API_URL, CDN_URL } from '../utils/constants'
+import { IRequest, IResponse, IApi, IProductsServerResponse, ICardData, IOrder, IBasketOperations, IPaymentForm, IContactsForm, IOrderData, TTotalPrice, TBasketItem } from '../types/index'
+import { API_URL, CDN_URL, basketCounter, modalContentCardPreview, basketTemplate, modalContentBasket, cardBasketTemplate, basketItems, formPaymentTemplate, modalContentPayment,
+  formContactsTemplate, modalContentContacts, successPopupTemplate, modalContentSuccessfulOrder } from '../utils/constants'
+import { pasteContent, toggleScrollLock } from '../utils/functions';
+
 
 export class CardApi implements IApi {
   private baseUrl: string;
@@ -38,7 +41,13 @@ export class CardApi implements IApi {
   }
 }
 
-export class ClientApi implements IApi {
+class ClientApi implements IApi {
+  private baseUrl: string;
+
+  constructor() {
+    this.baseUrl = API_URL;
+  }
+
   request<T>(request: IRequest<T>): Promise<IResponse<T>> {
     return fetch(request.url, {
       method: 'POST',
@@ -51,9 +60,47 @@ export class ClientApi implements IApi {
     .then(data => ({ status: response.status, data })))
     .catch(() => ({ status: 500, data: null }));
   }
+
+  postOrder(orderData: OrderData): Promise<IResponse<OrderData>> {
+    const request: IRequest<OrderData> = {
+      method: 'POST',
+      url: `${this.baseUrl}/order`,
+      data: orderData
+    };
+
+    return this.request<OrderData>(request)
+      .then(response => {
+        if (response.status === 200 && response.data) {
+          return { status: response.status, data: response.data };
+        } else {
+          return { status: response.status, data: null };
+        }
+      })
+      .catch(() => ({ status: 500, data: null }));
+    }
 }
 
-export class BaseCard implements ICardData {
+class OrderData implements IOrderData {
+  total: number;
+  items: string[]
+  payment: string;
+  address: string;
+  email: string;
+  phone: number;
+
+  constructor(basketData: Basket, paymentData: Payment, contactsData: Contacts) {
+    const itemsIdArray = basketData.items.map(item => item.id);
+
+    this.total = basketData.totalPrice;
+    this.items = itemsIdArray;
+    this.payment = paymentData.payment;
+    this.address = paymentData.address;
+    this.email = contactsData.email;
+    this.phone = contactsData.phone;
+  }
+}
+
+class CardData implements ICardData {
   image: string;
   title: string;
   category: string;
@@ -65,6 +112,12 @@ export class BaseCard implements ICardData {
     this.title = data.title;
     this.category = data.category;
     this.price = data.price;
+  }
+}
+
+class CardTemplate extends CardData {
+  constructor(data: ICardData) {
+    super(data);
   }
 
   protected createCard(templateId: string): void {
@@ -101,7 +154,7 @@ export class BaseCard implements ICardData {
   }
 }
 
-export class Popup {
+class Popup {
   protected savedScrollPosition: number = 0;
   protected modalElement: HTMLElement;
   public popup: Popup;
@@ -141,11 +194,10 @@ export class Popup {
   }
 }
 
-export class Card extends BaseCard {
+export class Card extends CardTemplate {
   constructor(data: ICardData) {
     super(data);
     this.createCard('#card-catalog');
-    
   }
 
   public getCard(): HTMLElement {
@@ -156,14 +208,11 @@ export class Card extends BaseCard {
   }
 }
 
-const modalContentCardPreview = document.querySelector('.modal__content_card-preview') as HTMLElement;//наверх
-const pageWrapper = document.querySelector('.page__wrapper');//наверх
-
-export class CardPopup extends BaseCard {
+export class CardPopup extends CardTemplate {
   id: string;
   description: string;
   basket: Basket;
-  basketUI: BasketUI;
+  basketPopup: BasketPopup;
   popup: Popup;
 
   constructor(data: ICardData, basket: Basket) {
@@ -172,7 +221,7 @@ export class CardPopup extends BaseCard {
     this.id = data.id;
     this.description = data.description;
     this.basket = basket;
-    this.basketUI = new BasketUI(basket);
+    this.basketPopup = new BasketPopup(basket);
     this.popup = new Popup('.modal_card-preview');
     this.closeModal = this.closeModal.bind(this);
 
@@ -180,202 +229,56 @@ export class CardPopup extends BaseCard {
 
     const cardDescription = this.cardElement.querySelector('.card__text');
     cardDescription.textContent = this.description;
+
+    const buyButton = this.cardElement.querySelector('.card__button') as HTMLButtonElement;
+    this.updateStateItem(buyButton);
+    
+    buyButton.addEventListener('click', (evt) => {
+      evt.stopPropagation();
+      this.toggleStateButton(buyButton);
+    })
     
   }
 
   openModal() {
     this.popup.openModal();
+  }
+
+  updateStateItem(button: HTMLButtonElement) {
+    let isInBasket = this.basket.items.some(item => item.id === this.id);
+    button.textContent = isInBasket ? 'Убрать' : 'Купить';
+  }
+
+  toggleStateButton(button: HTMLButtonElement) {
     const item = {
       id: this.id,
       title: this.title,
       price: this.price
     }
 
-    const buyButton = this.cardElement.querySelector('.card__button') as HTMLButtonElement;
     let isInBasket = this.basket.items.some(item => item.id === this.id);
-
-    function updateStateItem() {
-      buyButton.textContent = isInBasket ? 'Убрать' : 'Купить';
-    }
-    
-    updateStateItem();
-    
-    buyButton.addEventListener('click', (evt) => {
-      evt.stopPropagation();
-      isInBasket = !isInBasket;
+    isInBasket = !isInBasket;
 
       if (isInBasket) {
         this.basket.addToBasket(item);
-        this.basketUI.updateBasketPopup();
-        this.basketUI.updateOrderButtonState();
-        buyButton.textContent = 'Убрать';
+        this.basketPopup.updateBasketPopup();
+        this.basketPopup.updateOrderButtonState();
+        button.textContent = 'Убрать';
       } else {
         this.basket.deleteItem(item.id);
-        this.basketUI.updateBasketPopup();
-        this.basketUI.updateOrderButtonState();
-        buyButton.textContent = 'Купить';
+        this.basketPopup.updateBasketPopup();
+        this.basketPopup.updateOrderButtonState();
+        button.textContent = 'Купить';
       }
-      updateStateItem();
-    })
+      this.updateStateItem(button);
   }
-  
+
   closeModal() {
     this.popup.closeModal()
   }
 }
 
-export class BasketPopup {
-  public popup: Popup;
-  basket: Basket;
-  private basketUI: BasketUI;
-
-  constructor(basket: Basket) {
-    this.basketUI = new BasketUI(basket);
-    this.basket = basket;
-    this.popup = new Popup('.modal_basket');
-    this.openModal = this.openModal.bind(this);
-    this.closeModal = this.closeModal.bind(this);
-
-    const basketTemplate = document.querySelector('#basket') as HTMLTemplateElement;
-    const basketContainer = basketTemplate.content.cloneNode(true) as HTMLElement;
-    const modalContentBasket = document.querySelector('.modal__content_basket') as HTMLElement;//
-
-    pasteContent(modalContentBasket, basketContainer);
-    this.basketUI.updateBasketPopup();
-  }
-
-  openModal() {
-    this.popup.openModal();
-  }
-
-  closeModal() {
-    this.popup.closeModal();
-  }
-}
-
-export function toggleScrollLock(isLocked: boolean): void {
-  if (isLocked) {
-    pageWrapper.classList.add('page__wrapper_locked');
-  } else {
-    pageWrapper.classList.remove('page__wrapper_locked');
-  }
-}
-
-export function pasteContent(modalContent: HTMLElement, clonedElement: HTMLElement) {
-  if (modalContent) {
-    while (modalContent.firstChild) {
-      modalContent.removeChild(modalContent.firstChild);
-  }
-  modalContent.appendChild(clonedElement);
-  }
-}
-
-export class BasketUI {
-  private basket: Basket;
-  private basketList: HTMLUListElement;
-  private popup: Popup;
-  private totalPriceElement: HTMLSpanElement;
-  private basketIcon: BasketIcon;
-  private orderButton: HTMLButtonElement;
-
-  constructor(basket: Basket) {
-    this.basket = basket;
-    this.basketList = document.querySelector('.basket__list') as HTMLUListElement;
-    this.totalPriceElement = document.querySelector('.basket__price') as HTMLSpanElement;
-    this.orderButton = document.querySelector('.basket__button') as HTMLButtonElement;
-    this.basketIcon = new BasketIcon(basket);
-    this.popup = new Popup('.modal_basket');
-
-    this.makeOrder();
-  }
-  
-  updateOrderButtonState() {
-    if (this.basket.items.length === 0) {
-      this.orderButton.setAttribute('disabled', 'true');
-    } else {
-      this.orderButton.removeAttribute('disabled')
-    }
-  }
-  
-  updateBasketPopup(): void {
-    this.clearBasketList();
-    this.basket.items.forEach((item) => {
-      this.addItemToBasketPopup(item);
-    });
-    this.updateTotalPrice();
-    this.basketIcon.updateCounter();
-    this.updateOrderButtonState();
-  }
-
-  private clearBasketList(): void {
-    while (this.basketList.firstChild) {
-      this.basketList.removeChild(this.basketList.firstChild);
-    }
-  }
-  
-  private updateItemIndexes(): void {
-    const basketItems = document.querySelectorAll('.basket__item');
-    basketItems.forEach((item, index) => {
-      const itemIndex = item.querySelector('.basket__item-index');
-      itemIndex.textContent = (index + 1).toString();
-    });
-  }
-
-  private addItemToBasketPopup(item: TBasketItem): void {
-    const cardBasketTemplate = document.querySelector('#card-basket') as HTMLTemplateElement;//наверх
-    const cardBasketElement = cardBasketTemplate.content.querySelector('.basket__item').cloneNode(true) as HTMLElement;
-    const cardTitle = cardBasketElement.querySelector('.card__title');
-    const cardPrice = cardBasketElement.querySelector('.card__price');
-
-    cardBasketElement.setAttribute('data-id', item.id);
-    cardTitle.textContent = item.title;
-    
-    
-    if (typeof item.price === 'number') {
-      cardPrice.textContent = `${item.price} синапсов`;
-    } else {
-      cardPrice.textContent = 'Бесценно';
-    }
-
-    const deleteButton = cardBasketElement.querySelector('.basket__item-delete') as HTMLButtonElement;
-    deleteButton.addEventListener('click', () => {
-      this.basket.deleteItem(item.id);
-      this.removeItemFromBasketPopup(item.id);
-    });
-
-    this.basketList.appendChild(cardBasketElement);
-    this.updateItemIndexes();
-    this.updateOrderButtonState();
-  }
-
-  private removeItemFromBasketPopup(itemID: string): void {
-    const basketItems = document.querySelectorAll('.basket__item');
-    basketItems.forEach((item) => {
-      if (item.getAttribute('data-id') === itemID) {
-        item.remove();
-      }
-    });
-    this.updateTotalPrice();
-    this.updateItemIndexes();
-    this.updateBasketPopup();
-    this.updateOrderButtonState();
-  }
-
-  private updateTotalPrice(): void {
-    this.totalPriceElement.textContent = `${this.basket.totalPrice} синапсов`;
-  }
-
-  makeOrder() {
-    const paymentPopup = new PaymentPopup();
-    this.orderButton.addEventListener('click', () => {
-      this.popup.closeModal();
-      paymentPopup.openModal();
-    })
-  }
-  
-}
-
-export class Basket implements IOrder, IBasketOperations {
+class Basket implements IOrder, IBasketOperations {
   items: TBasketItem[] = [];
   totalPrice: number = 0;
 
@@ -386,9 +289,6 @@ export class Basket implements IOrder, IBasketOperations {
   addToBasket(item: TBasketItem): void {
     this.items.push(item);
     this.calculateTotalPrice();
-
-    console.log(`${item.title} добавлен в корзину`);
-    console.log(this.totalPrice)
   }
 
   calculateTotalPrice(): number {
@@ -404,20 +304,8 @@ export class Basket implements IOrder, IBasketOperations {
     const itemIndex = this.items.findIndex(item => item.id === id);
 
     if (itemIndex !== -1) {
-    
-      const updatedItems = [...this.items];
-      const removedItem = updatedItems[itemIndex];
-
-      updatedItems.splice(itemIndex, 1);
-
-      const removedItemPrice = removedItem.price;
-      let updatedTotalPrice = this.totalPrice - removedItemPrice;
-
-      this.items = updatedItems;
-      this.totalPrice = updatedTotalPrice;
-
-      console.log(`Товар "${removedItem.title}" удалён из корзины`);
-      console.log(this.items);
+      this.items.splice(itemIndex, 1);
+      this.calculateTotalPrice();
     }
   }
 
@@ -433,7 +321,7 @@ class BasketIcon {
 
   constructor(basket: Basket) {
     this.basket = basket;
-    this.counter = document.querySelector('.header__basket-counter') as HTMLSpanElement;
+    this.counter = basketCounter;
 
     this.updateCounter();
   }
@@ -444,7 +332,121 @@ class BasketIcon {
   }
 }
 
-export class Payment implements IPaymentForm {
+export class BasketPopup {
+  private popup: Popup;
+  private basket: Basket;
+  private basketList: HTMLUListElement;
+  private totalPriceElement: HTMLSpanElement;
+  private basketIcon: BasketIcon;
+  private orderButton: HTMLButtonElement;
+
+  constructor(basket: Basket) {
+    const basketContainer = basketTemplate.content.cloneNode(true) as HTMLElement;
+
+    this.basket = basket;
+    this.popup = new Popup('.modal_basket');
+    this.basketIcon = new BasketIcon(basket);
+    this.basketList = basketContainer.querySelector('.basket__list') as HTMLUListElement;
+    this.totalPriceElement = basketContainer.querySelector('.basket__price') as HTMLSpanElement;
+    this.orderButton = basketContainer.querySelector('.basket__button') as HTMLButtonElement;
+    this.openModal = this.openModal.bind(this);
+    this.closeModal = this.closeModal.bind(this);
+    this.makeOrder = this.makeOrder.bind(this);
+
+    pasteContent(modalContentBasket, basketContainer);
+
+    this.updateBasketPopup();
+    this.orderButton.addEventListener('click', this.makeOrder)
+  }
+
+  openModal() {
+    this.popup.openModal();
+  }
+
+  closeModal() {
+    this.popup.closeModal();
+  }
+
+  updateOrderButtonState() {
+    if (this.basket.items.length === 0) {
+      this.orderButton.setAttribute('disabled', 'true');
+    } else {
+      this.orderButton.removeAttribute('disabled')
+    }
+  }
+
+  clearBasketList(): void {
+    while (this.basketList.firstChild) {
+      this.basketList.removeChild(this.basketList.firstChild);
+    }
+  }
+
+  updateItemIndexes(): void {
+    const basketItems = document.querySelectorAll('.basket__item');
+    basketItems.forEach((item, index) => {
+      const itemIndex = item.querySelector('.basket__item-index');
+      itemIndex.textContent = (index + 1).toString();
+    });
+  }
+
+  updateTotalPrice(): void {
+    this.totalPriceElement.textContent = `${this.basket.totalPrice} синапсов`;
+  }
+
+  updateBasketPopup(): void {
+    this.clearBasketList();
+    this.basket.items.forEach((item) => {
+      this.addItemToBasketPopup(item);
+    });
+    this.updateTotalPrice();
+    this.basketIcon.updateCounter();
+    this.updateOrderButtonState();
+  }
+
+  addItemToBasketPopup(item: TBasketItem): void {
+    const cardBasketElement = cardBasketTemplate.content.querySelector('.basket__item').cloneNode(true) as HTMLElement;
+    const cardTitle = cardBasketElement.querySelector('.card__title');
+    const cardPrice = cardBasketElement.querySelector('.card__price');
+    const deleteButton = cardBasketElement.querySelector('.basket__item-delete') as HTMLButtonElement;
+
+    cardBasketElement.setAttribute('data-id', item.id);
+    cardTitle.textContent = item.title;
+    
+    if (typeof item.price === 'number') {
+      cardPrice.textContent = `${item.price} синапсов`;
+    } else {
+      cardPrice.textContent = 'Бесценно';
+    }
+    
+    deleteButton.addEventListener('click', () => {
+      this.basket.deleteItem(item.id);
+      this.removeItemFromBasketPopup(item.id);
+    });
+
+    this.basketList.appendChild(cardBasketElement);
+    this.updateItemIndexes();
+    this.updateOrderButtonState();
+  }
+
+  removeItemFromBasketPopup(itemId: string): void {
+    basketItems.forEach((item) => {
+      if (item.getAttribute('data-id') === itemId) {
+        item.remove();
+      }
+    });
+    this.updateTotalPrice();
+    this.updateItemIndexes();
+    this.updateBasketPopup();
+    this.updateOrderButtonState();
+  }
+
+  makeOrder() {
+    this.popup.closeModal();
+    paymentPopup.openModal();
+  }
+}
+
+class Payment implements IPaymentForm {
   payment: string;
   address: string;
 
@@ -460,19 +462,48 @@ export class Payment implements IPaymentForm {
   enterAddress(inputAddress: HTMLInputElement) {
     this.address = inputAddress.value;
   }
+}
 
-  submit() {
-    if (!this.payment || !this.address) {
-      console.error('Необходимо выбрать метод оплаты и ввести адрес.');
-      return;
+class Validation {
+  inputElement: HTMLInputElement;
+  errorElement: HTMLSpanElement;
+
+  constructor(inputElement: HTMLInputElement, errorElement: HTMLSpanElement) {
+    this.inputElement = inputElement;
+    this.errorElement = errorElement;
+  }
+
+  checkValidation(inputElement: HTMLInputElement): boolean {
+    if (inputElement.value.trim() === '') {
+      this.showErrorMessage();
+      return false
+    } else if (inputElement.validity.typeMismatch) {
+      this.showErrorMessage();
+      return false
+    } else {
+      this.hideErrorMessage();
+      return true
     }
-    console.log(`Метод оплаты: ${this.payment}, Адрес: ${this.address}`);
+  }
+
+  showErrorMessage() {
+    if (this.inputElement.value.trim() === '') {
+      this.inputElement.setCustomValidity(this.inputElement.dataset.errorMessage);
+      this.errorElement.textContent = this.inputElement.validationMessage;
+    } else if (this.inputElement.validity.typeMismatch) {
+      this.errorElement.textContent = this.inputElement.validationMessage;
+    }
+  }
+
+  hideErrorMessage() {
+    this.inputElement.setCustomValidity('');
+    this.errorElement.textContent = '';
   }
 }
 
-export class PaymentPopup {
+class PaymentPopup {
   private popup: Popup;
-  private payment: Payment;
+  protected payment: Payment;
   private onlineButton: HTMLButtonElement;
   private onDeliveryButton: HTMLButtonElement;
   private addressInput: HTMLInputElement;
@@ -481,9 +512,7 @@ export class PaymentPopup {
   private nextButton: HTMLButtonElement;
 
   constructor() {
-    const formPaymentTemplate = document.querySelector('#order') as HTMLTemplateElement;//наверх
     const formElement = formPaymentTemplate.content.querySelector('.form').cloneNode(true) as HTMLElement;
-    const modalContentPayment = document.querySelector('.modal__content_payment') as HTMLElement;
     const onlineButton = formElement.querySelector('.button_alt-online') as HTMLButtonElement;
     const onDeliveryButton = formElement.querySelector('.button_alt-on-delivery') as HTMLButtonElement;
     const addressInput = formElement.querySelector('.form__input') as HTMLInputElement;
@@ -498,8 +527,6 @@ export class PaymentPopup {
     this.errorElement = errorElement;
     this.validation = new Validation(this.addressInput, this.errorElement);
     this.nextButton = nextButton;
-
-    console.log(onlineButton)
 
     this.openModal = this.openModal.bind(this);
     this.closeModal = this.closeModal.bind(this);
@@ -576,56 +603,39 @@ export class PaymentPopup {
     if (inputIsValid && buttonIsActive) {
       this.nextButton.removeAttribute('disabled');
     } else {
-      console.log(this.addressInput.validity.valid, buttonIsActive)
       this.nextButton.setAttribute('disabled', 'true');
     }
   }
 
+  getPayment() {
+    return this.payment
+  }
+
   submit() {
-    const contactsPopup = new ContactsPopup();
     this.popup.closeModal();
     contactsPopup.openModal();
   }
 }
 
-class Validation {
-  inputElement: HTMLInputElement;
-  errorElement: HTMLSpanElement;
+class Contacts implements IContactsForm {
+  email: string;
+  phone: number;
 
-  constructor(inputElement: HTMLInputElement, errorElement: HTMLSpanElement) {
-    this.inputElement = inputElement;
-    this.errorElement = errorElement;
+  constructor(email: string, phone: number) {
+    this.email = email;
+    this.phone = phone;
   }
 
-  checkValidation(inputElement: HTMLInputElement): boolean {
-    if (inputElement.value.trim() === '') {
-      this.showErrorMessage();
-      return false
-    } else if (inputElement.validity.typeMismatch) {
-      this.showErrorMessage();
-      return false
-    } else {
-      this.hideErrorMessage();
-      return true
-    }
+  enterEmail(inputEmail: HTMLInputElement) {
+    this.email = inputEmail.value;
   }
 
-  showErrorMessage() {
-    if (this.inputElement.value.trim() === '') {
-      this.inputElement.setCustomValidity(this.inputElement.dataset.errorMessage);
-      this.errorElement.textContent = this.inputElement.validationMessage;
-    } else if (this.inputElement.validity.typeMismatch) {
-      this.errorElement.textContent = this.inputElement.validationMessage;
-    }
-  }
-
-  hideErrorMessage() {
-    this.inputElement.setCustomValidity('');
-    this.errorElement.textContent = '';
+  enterPhone(inputPhone: HTMLInputElement) {
+    this.phone = parseInt(inputPhone.value);
   }
 }
 
-export class ContactsPopup {
+class ContactsPopup {
   private popup: Popup;
   private contacts: Contacts;
   private emailInput: HTMLInputElement;
@@ -637,9 +647,7 @@ export class ContactsPopup {
   private submitButton: HTMLButtonElement;
 
   constructor() {
-    const formContactsTemplate = document.querySelector('#contacts') as HTMLTemplateElement;//наверх
     const formElement = formContactsTemplate.content.querySelector('.form').cloneNode(true) as HTMLElement;
-    const modalContentContacts = document.querySelector('.modal__content_contacts') as HTMLElement;
     const emailInput = formElement.querySelector('.form__input-email') as HTMLInputElement;
     const emailErrorElement = formElement.querySelector('.email-input_error-message') as HTMLSpanElement;
     const phoneInput = formElement.querySelector('.form__input-phone') as HTMLInputElement;
@@ -663,14 +671,12 @@ export class ContactsPopup {
 
     this.emailInput.addEventListener('input', () => {
       this.checkValidation();
-      this.email = this.emailInput.value;
-      this.contacts.email = this.email;
+      this.contacts.enterEmail(this.emailInput);
     });
 
     this.phoneInput.addEventListener('input', () => {
       this.checkValidation();
-      this.phone = parseInt(this.phoneInput.value);
-      this.contacts.phone = this.phone;
+      this.contacts.enterPhone(this.phoneInput);
     });
 
     this.submitButton.addEventListener('click', (evt) => {
@@ -696,56 +702,36 @@ export class ContactsPopup {
     }
   }
 
+  getContacts() {
+    return this.contacts;
+  }
+
   submit() {
+    const paymentData = paymentPopup.getPayment();
+    const contactsData = this.getContacts();
+    const orderData = new OrderData(basketData, paymentData, contactsData);
     const successfulOrderPopup = new SuccessfulOrderPopup();
+    clientApi.postOrder(orderData);
     this.popup.closeModal();
     successfulOrderPopup.openModal();
   }
 }
 
-export class Contacts implements IContactsForm {
-  email: string;
-  phone: number;
-
-  constructor(email: string, phone: number) {
-    this.email = email;
-    this.phone = phone;
-  }
-
-  enterEmail(inputEmail: string) {
-    this.email = inputEmail;
-  }
-
-  enterPhone(inputPhone: number) {
-    this.phone = inputPhone;
-  }
-
-  submit() {
-    if (!this.email || !this.phone) {
-      console.error('Необходимо ввести адрес электронной почты и номер телефона.');
-      return;
-    }
-    console.log(`Email: ${this.email}, телефон: ${this.phone}`);
-  }
-}
-
-export class SuccessfulOrderPopup {
-  successfulOrder: SuccessfulOrder;
+class SuccessfulOrderPopup {
+  totalPrice: number;
   basket: Basket;
   homeButton: HTMLButtonElement;
   notificationElement: HTMLParagraphElement
   popup: Popup;
 
   constructor() {
-    const successPopupTemplate = document.querySelector('#success') as HTMLTemplateElement;//наверх
     const successPopup = successPopupTemplate.content.querySelector('.order-success').cloneNode(true) as HTMLElement;
-    const modalContentSuccessfulOrder = document.querySelector('.modal__content_success') as HTMLElement;
     const spentTokensNotification = successPopup.querySelector('.order-success__description') as HTMLParagraphElement;
     const homeButton = successPopup.querySelector('.order-success__close') as HTMLButtonElement;
   
     this.popup = new Popup('.modal_success');
-    this.basket = basket;
-    this.successfulOrder = new SuccessfulOrder(this.basket);
+    this.basket = basketData;
+    this.totalPrice = this.basket.totalPrice;
     this.notificationElement = spentTokensNotification;
     this.homeButton = homeButton;
 
@@ -755,7 +741,7 @@ export class SuccessfulOrderPopup {
     this.closeModal = this.closeModal.bind(this);
     this.returnToHomeScreen = this.returnToHomeScreen.bind(this);
 
-    this.notificationElement.textContent = `Списано ${this.successfulOrder.totalPrice} синапсов`
+    this.notificationElement.textContent = `Списано ${this.totalPrice} синапсов`
 
     this.homeButton.addEventListener('click', this.returnToHomeScreen);
   }
@@ -775,14 +761,7 @@ export class SuccessfulOrderPopup {
   }
 }
 
-export class SuccessfulOrder implements TTotalPrice {
-  totalPrice: number;
-  basket: Basket;
-
-  constructor(basket: Basket) {
-    this.basket = basket;
-    this.totalPrice = this.basket.totalPrice;
-  }
-}
-
-export const basket = new Basket();
+export const basketData = new Basket();
+const paymentPopup = new PaymentPopup();
+const contactsPopup = new ContactsPopup();
+const clientApi = new ClientApi();
