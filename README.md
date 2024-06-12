@@ -102,8 +102,8 @@ interface IContactsForm {
   email: string;
   phone: number;
   
-  enterEmail(inputEmail: string): void;
-  enterPhone(inputPhone: number): void;
+  enterEmail(inputEmail: HTMLInputElement): void;
+  enterPhone(inputPhone: HTMLInputElement): void;
 }
 ```
 Данные для `POST`-запроса, принимаемые сервером
