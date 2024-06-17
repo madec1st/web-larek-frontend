@@ -1,70 +1,71 @@
 import { Popup } from "./popup";
 import { Payment } from "./payment";
-import { Validation } from "./validation";
+import { FormValidation } from "./validation";
 import { pasteContent } from "../utils/functions";
 import { formPaymentTemplate, modalContentPayment } from "../utils/constants";
+import { OrderData } from "./orderData";
 
-export class PaymentPopup {
-  private popup: Popup;
+export class PaymentPopup extends Popup {
   protected payment: Payment;
+  private orderData: OrderData;
   private onlineButton: HTMLButtonElement;
   private onDeliveryButton: HTMLButtonElement;
   private addressInput: HTMLInputElement;
-  private errorElement: HTMLSpanElement;
-  private validation: Validation
+  private formValidation: FormValidation;
   public nextButton: HTMLButtonElement;
 
-  constructor(payment: Payment) {
-    const formElement = formPaymentTemplate.content.querySelector('.form').cloneNode(true) as HTMLElement;
+  constructor(payment: Payment, orderData: OrderData) {
+    super('.modal_payment');
+    const formElement = formPaymentTemplate.content.querySelector('.form').cloneNode(true) as HTMLFormElement;
     const onlineButton = formElement.querySelector('.button_alt-online') as HTMLButtonElement;
     const onDeliveryButton = formElement.querySelector('.button_alt-on-delivery') as HTMLButtonElement;
     const addressInput = formElement.querySelector('.form__input') as HTMLInputElement;
-    const errorElement = formElement.querySelector('.address-input_error-message') as HTMLSpanElement;
-    const nextButton = formElement.querySelector('.order__button') as HTMLButtonElement;
+    const nextButton = formElement.querySelector('.form__button') as HTMLButtonElement;
 
     this.payment = payment;
-    this.popup = new Popup('.modal_payment');
+    this.orderData = orderData;
     this.onlineButton = onlineButton;
     this.onDeliveryButton = onDeliveryButton;
     this.addressInput = addressInput;
-    this.errorElement = errorElement;
-    this.validation = new Validation(this.addressInput, this.errorElement);
+    this.formValidation = new FormValidation(formElement);
     this.nextButton = nextButton;
 
     this.openModal = this.openModal.bind(this);
     this.closeModal = this.closeModal.bind(this);
     this.handleOnlineClick = this.handleOnlineClick.bind(this);
     this.handleOnDeliveryClick = this.handleOnDeliveryClick.bind(this);
-    this.checkInputValidity = this.checkInputValidity.bind(this);
 
     pasteContent(modalContentPayment, formElement);
 
     this.onlineButton.addEventListener('click', () => {
       this.handleOnlineClick();
-      if (this.addressInput.value !== '') {
-        this.checkValidation();
+      if (this.addressInput.value) {
+        this.checkFormValidity();
       }
     });
     
     this.onDeliveryButton.addEventListener('click', () => {
       this.handleOnDeliveryClick();
-      if (this.addressInput.value !== '') {
-        this.checkValidation();
+      if (this.addressInput.value) {
+        this.checkFormValidity();
       }
     });
 
     this.addressInput.addEventListener('input', () => {
-      this.checkInputValidity();
-      this.checkValidation();
+      if (this.formValidation.checkInputValidity(this.addressInput)) {
+        this.payment.enterAddress(this.addressInput);
+        this.orderData.addressSet = this.payment.address;
+        this.checkFormValidity();
+      }
     });
   }
 
   public openModal() {
-    this.popup.openModal();
+    super.openModal();
   }
 
   public closeModal() {
-    this.popup.closeModal();
+    super.closeModal();
   }
 
   private selectPaymentMethod(button: HTMLButtonElement, method: 'online' | 'onDelivery') {
@@ -77,6 +78,7 @@ export class PaymentPopup {
 
     button.classList.add('button_alt-active');
     this.payment.selectPaymentMethod(method);
+    this.orderData.paymentSet = this.payment.payment;
   }  
 
   private handleOnlineClick() {
@@ -87,20 +89,15 @@ export class PaymentPopup {
     this.selectPaymentMethod(this.onDeliveryButton, 'onDelivery');
   }
 
-  private checkInputValidity() {
-    this.validation.checkValidation(this.addressInput);
-    this.payment.enterAddress(this.addressInput);
-  }
-
   private isActive(button: HTMLButtonElement) {
     if (button.classList.contains('button_alt-active')) {
       return true
     } else return false
   }
 
-  private checkValidation() {
+  private checkFormValidity() {
     const buttonIsActive = this.isActive(this.onlineButton) || this.isActive(this.onDeliveryButton);
-    const inputIsValid = this.validation.checkValidation(this.addressInput);
+    const inputIsValid = this.formValidation.checkInputValidity(this.addressInput);
 
     if (inputIsValid && buttonIsActive) {
       this.nextButton.removeAttribute('disabled');

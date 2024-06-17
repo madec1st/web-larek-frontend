@@ -1,6 +1,6 @@
 import { toggleScrollLock } from "../utils/functions";
 
-export class Popup {
+export abstract class Popup {
   protected savedScrollPosition: number = 0;
   protected modalElement: HTMLElement;
   public popup: Popup;
@@ -12,7 +12,6 @@ export class Popup {
     this.closeModal = this.closeModal.bind(this)
     this.closeBySpaceAround = this.closeBySpaceAround.bind(this);
   }
- 
 
   public openModal(): void {
     this.savedScrollPosition = window.scrollY;
@@ -20,7 +19,6 @@ export class Popup {
     toggleScrollLock(true);
     this.closeButton.addEventListener('click', this.closeModal);
     document.addEventListener('click', this.closeBySpaceAround);
-    
   }
 
   public closeModal(): void {

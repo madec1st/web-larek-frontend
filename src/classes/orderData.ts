@@ -1,7 +1,4 @@
 import { IOrderData } from "../types";
-import { Basket } from "./basket";
-import { Payment } from "./payment";
-import { Contacts } from "./contacts";
 
 export class OrderData implements IOrderData {
   total: number;
@@ -11,14 +8,36 @@ export class OrderData implements IOrderData {
   email: string;
   phone: number;
 
-  constructor(basket: Basket, payment: Payment, contacts: Contacts) {
-    const itemsIdArray = basket.items.map(item => item.id);
+  constructor() {
+    this.total = 0;
+    this.items = [];
+    this.payment = '';
+    this.address = '';
+    this.email = '';
+    this.phone = 0;
+  }
 
-    this.total = basket.totalPrice;
-    this.items = itemsIdArray;
-    this.payment = payment.payment;
-    this.address = payment.address;
-    this.email = contacts.email;
-    this.phone = contacts.phone;
+  set totalSet (value: number) {
+    this.total = value;
+  }
+
+  set itemsSet (value: string[]) {
+    this.items = value;
+  }
+
+  set paymentSet (value: string) {
+    this.payment = value;
+  }
+
+  set addressSet (value: string) {
+    this.address = value;
+  }
+
+  set emailSet (value: string) {
+    this.email = value;
+  }
+
+  set phoneSet (value: number) {
+    this.phone = value;
   }
 }

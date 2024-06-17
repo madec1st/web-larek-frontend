@@ -3,21 +3,23 @@ import { Basket } from "./basket";
 import { Popup } from "./popup";
 import { successPopupTemplate, modalContentSuccessfulOrder } from "../utils/constants";
 import { pasteContent } from "../utils/functions";
+import { BasketIcon } from "./basketIcon";
 
-export class SuccessfulOrderPopup implements TTotalPrice {
+export class SuccessfulOrderPopup extends Popup implements TTotalPrice {
   public totalPrice: number;
   private basket: Basket;
+  private basketIcon: BasketIcon;
   public homeButton: HTMLButtonElement;
-  private notificationElement: HTMLParagraphElement
-  private popup: Popup;
+  private notificationElement: HTMLParagraphElement;
 
-  constructor(basket: Basket) {
+  constructor(basket: Basket, basketIcon: BasketIcon) {
+    super('.modal_success');
     const successPopup = successPopupTemplate.content.querySelector('.order-success').cloneNode(true) as HTMLElement;
     const spentTokensNotification = successPopup.querySelector('.order-success__description') as HTMLParagraphElement;
     const homeButton = successPopup.querySelector('.order-success__close') as HTMLButtonElement;
   
-    this.popup = new Popup('.modal_success');
     this.basket = basket;
+    this.basketIcon = basketIcon;
     this.notificationElement = spentTokensNotification;
     this.homeButton = homeButton;
 
@@ -29,11 +31,13 @@ export class SuccessfulOrderPopup implements TTotalPrice {
 
   public openModal() {
     this.printTotalPrice();
-    this.popup.openModal();
+    super.openModal();
   }
-
+  
   public closeModal() {
-    this.popup.closeModal();
+    this.basket.clearOrder();
+    this.basketIcon.updateCounter(this.basket.items.length);
+    super.closeModal();
   }
 
   private printTotalPrice() {

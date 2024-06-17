@@ -1,10 +1,20 @@
-import { ICardData } from "../types";
 import { CardData } from "./cardData";
+import { Popup } from "./popup"; 
 import { CDN_URL } from "../utils/constants";
 
-export class CardTemplate extends CardData {
-  constructor(data: ICardData) {
-    super(data);
+export abstract class CardTemplate extends Popup {
+  protected image: string;
+  protected title: string;
+  protected category: string;
+  protected price: number|null;
+  public cardElement: HTMLElement | null = null;
+
+  constructor(cardData: CardData) {
+    super('.modal_card-preview');
+    this.image = cardData.image;
+    this.title = cardData.title;
+    this.category = cardData.category;
+    this.price = cardData.price;
   }
 
   protected createCard(templateId: string): void {

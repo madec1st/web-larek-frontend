@@ -1,27 +1,25 @@
-import { ICardData } from "../types";
+import { CardData } from "./cardData";
 import { CardTemplate } from "./cardTemplate";
 import { Basket } from "./basket";
 import { BasketIcon } from "./basketIcon";
-import { Popup } from "./popup";
 import { pasteContent } from "../utils/functions";
 import { modalContentCardPreview } from "../utils/constants";
 
 export class CardPopup extends CardTemplate {
-  id: string;
-  description: string;
-  basket: Basket;
-  basketIcon: BasketIcon;
-  popup: Popup;
+  private id: string;
+  private description: string;
+  private basket: Basket;
+  private basketIcon: BasketIcon;
 
-  constructor(data: ICardData, basket: Basket, basketIcon: BasketIcon) {
+  constructor(data: CardData, basket: Basket, basketIcon: BasketIcon) {
     super(data);
     this.createCard('#card-preview');
     this.id = data.id;
     this.description = data.description;
     this.basket = basket;
     this.basketIcon = basketIcon;
-    this.popup = new Popup('.modal_card-preview');
-    this.closeModal = this.closeModal.bind(this);
+    this.openModal = this.openModal.bind(this)
+    this.closeModal = this.closeModal.bind(this)
 
     pasteContent(modalContentCardPreview, this.cardElement);
 
@@ -30,6 +28,10 @@ export class CardPopup extends CardTemplate {
 
     const buyButton = this.cardElement.querySelector('.card__button') as HTMLButtonElement;
     this.updateStateItem(buyButton);
+
+    if (this.price === null) {
+      buyButton.setAttribute('disabled', 'true');
+    }
     
     buyButton.addEventListener('click', (evt) => {
       evt.stopPropagation();
@@ -39,7 +41,11 @@ export class CardPopup extends CardTemplate {
   }
 
   public openModal() {
-    this.popup.openModal();
+    super.openModal();
+  }
+
+  public closeModal() {
+    super.closeModal()
   }
 
   private updateStateItem(button: HTMLButtonElement) {
@@ -59,18 +65,16 @@ export class CardPopup extends CardTemplate {
 
     if (isInBasket) {
       this.basket.addToBasket(item);
-      this.basketIcon.updateCounter();
+      this.basketIcon.updateCounter(this.basket.items.length);
       button.textContent = 'Убрать';
     } else {
       this.basket.deleteItem(item.id);
-      this.basketIcon.updateCounter();
+      this.basketIcon.updateCounter(this.basket.items.length);
       button.textContent = 'Купить';
     }
     
     this.updateStateItem(button);
   }
 
-  public closeModal() {
-    this.popup.closeModal()
-  }
+  
 }

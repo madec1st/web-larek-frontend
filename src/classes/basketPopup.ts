@@ -1,24 +1,25 @@
 import { TBasketItem } from "../types";
 import { Basket } from "./basket";
+import { OrderData } from "./orderData";
 import { BasketIcon } from "./basketIcon";
 import { Popup } from "./popup";
 import { basketTemplate, modalContentBasket, cardBasketTemplate, basketItems } from "../utils/constants";
 import { pasteContent } from "../utils/functions";
 
-export class BasketPopup {
-  private popup: Popup;
+export class BasketPopup extends Popup {
   private basket: Basket;
+  private orderData: OrderData;
   private basketList: HTMLUListElement;
   private totalPriceElement: HTMLSpanElement;
   private basketIcon: BasketIcon;
   public orderButton: HTMLButtonElement;
 
-  constructor(basket: Basket, basketIcon: BasketIcon) {
+  constructor(basket: Basket, basketIcon: BasketIcon, orderData: OrderData) {
+    super('.modal_basket');
     const basketContainer = basketTemplate.content.cloneNode(true) as HTMLElement;
 
     this.basket = basket;
-    console.log(this.basket)
-    this.popup = new Popup('.modal_basket');
+    this.orderData = orderData;
     this.basketIcon = basketIcon;
     this.basketList = basketContainer.querySelector('.basket__list') as HTMLUListElement;
     this.totalPriceElement = basketContainer.querySelector('.basket__price') as HTMLSpanElement;
@@ -32,12 +33,12 @@ export class BasketPopup {
   }
 
   public openModal() {
-    this.popup.openModal();
+    super.openModal();
     this.updateBasketPopup()
   }
 
   public closeModal() {
-    this.popup.closeModal();
+    super.closeModal();
   }
 
   private updateOrderButtonState() {
@@ -72,8 +73,10 @@ export class BasketPopup {
       this.addItemToBasketPopup(item);
     });
     this.updateTotalPrice();
-    this.basketIcon.updateCounter();
+    this.basketIcon.updateCounter(this.basket.items.length);
     this.updateOrderButtonState();
+    this.orderData.itemsSet = this.basket.items.map(item => item.id);
+    this.orderData.totalSet = this.basket.totalPrice;
   }
 
   private addItemToBasketPopup(item: TBasketItem): void {
@@ -84,12 +87,7 @@ export class BasketPopup {
 
     cardBasketElement.setAttribute('data-id', item.id);
     cardTitle.textContent = item.title;
-    
-    if (typeof item.price === 'number') {
-      cardPrice.textContent = `${item.price} синапсов`;
-    } else {
-      cardPrice.textContent = 'Бесценно';
-    }
+    cardPrice.textContent = `${item.price} синапсов`;
     
     deleteButton.addEventListener('click', () => {
       this.basket.deleteItem(item.id);

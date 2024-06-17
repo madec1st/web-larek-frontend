@@ -1,70 +1,58 @@
 import { Popup } from "./popup";
 import { Contacts } from "./contacts";
-import { Validation } from "./validation";
+import { FormValidation } from "./validation";
 import { pasteContent } from "../utils/functions";
 import { formContactsTemplate, modalContentContacts } from "../utils/constants";
+import { OrderData } from "./orderData";
 
-export class ContactsPopup {
-  private popup: Popup;
+export class ContactsPopup extends Popup {
   private contacts: Contacts;
+  private orderData: OrderData;
   private emailInput: HTMLInputElement;
   private phoneInput: HTMLInputElement;
-  private validationEmail: Validation;
-  private validationPhone: Validation;
+  private formValidation: FormValidation;
   public submitButton: HTMLButtonElement;
 
-  constructor(contacts: Contacts) {
-    const formElement = formContactsTemplate.content.querySelector('.form').cloneNode(true) as HTMLElement;
+  constructor(contacts: Contacts, orderData: OrderData) {
+    super('.modal_contacts');
+    const formElement = formContactsTemplate.content.querySelector('.form').cloneNode(true) as HTMLFormElement;
     const emailInput = formElement.querySelector('.form__input-email') as HTMLInputElement;
-    const emailErrorElement = formElement.querySelector('.email-input_error-message') as HTMLSpanElement;
     const phoneInput = formElement.querySelector('.form__input-phone') as HTMLInputElement;
-    const phoneErrorElement = formElement.querySelector('.phone-input_error-message') as HTMLSpanElement;
-    const submitButton = formElement.querySelector('.button_submit') as HTMLButtonElement;
+    const submitButton = formElement.querySelector('.form__button') as HTMLButtonElement;
 
-    this.popup = new Popup('.modal_contacts');
     this.emailInput = emailInput;
     this.phoneInput = phoneInput;
     this.submitButton = submitButton;
     this.contacts = contacts;
-    this.validationEmail = new Validation(emailInput, emailErrorElement);
-    this.validationPhone = new Validation(phoneInput, phoneErrorElement);
-
+    this.orderData = orderData;
+    this.formValidation = new FormValidation(formElement);
 
     this.openModal = this.openModal.bind(this);
     this.closeModal = this.closeModal.bind(this);
-    this.checkValidation = this.checkValidation.bind(this);
 
     pasteContent(modalContentContacts, formElement);
 
     this.emailInput.addEventListener('input', () => {
-      if (this.phoneInput.value !== '') {
-        this.checkValidation();
-      }
-      this.contacts.enterEmail(this.emailInput);
+      if (this.formValidation.checkInputValidity(this.emailInput)) {
+        this.contacts.enterEmail(this.emailInput);
+        this.orderData.emailSet = this.contacts.email;
+      }      
     });
 
     this.phoneInput.addEventListener('input', () => {
-      if (this.emailInput.value !== '') {
-        this.checkValidation();
+      if (this.formValidation.checkInputValidity(this.phoneInput)) {
+        this.contacts.enterPhone(this.phoneInput);
+        this.orderData.phoneSet = this.contacts.phone;
       }
-      this.contacts.enterPhone(this.phoneInput);
     });
   }
 
   public openModal() {
-    this.popup.openModal();
+    super.openModal();
   }
 
   public closeModal() {
-    this.popup.closeModal();
-  }
-
-  private checkValidation() {
-    if (this.validationEmail.checkValidation(this.emailInput) && this.validationPhone.checkValidation(this.phoneInput)) {
-      this.submitButton.removeAttribute('disabled');
-    } else {
-      this.submitButton.setAttribute('disabled', 'true')
-    }
+    super.closeModal();
   }
 
   public clearForm() {

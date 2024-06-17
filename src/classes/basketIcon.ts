@@ -5,15 +5,12 @@ export class BasketIcon {
   private basket: Basket;
   private counter: HTMLSpanElement;
 
-  constructor(basket: Basket) {
-    this.basket = basket;
+  constructor() {
     this.counter = basketCounter;
-
-    this.updateCounter();
+    this.updateCounter(0);
   }
 
-  public updateCounter(): void {
-    const currentCounter = this.basket.items.length;
-    this.counter.textContent = currentCounter.toString();
+  public updateCounter(currentCount: number): void {
+    this.counter.textContent = currentCount.toString();
   }
 }

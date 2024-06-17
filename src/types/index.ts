@@ -19,8 +19,8 @@ export interface IProductsServerResponse {
 }
 
 export interface ICardData {
-  id?: string;
-  description?: string;
+  id: string;
+  description: string;
   image: string;
   title: string;
   category: string;

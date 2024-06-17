@@ -1,3 +1,4 @@
+import { CardData } from "../classes/cardData";
 import { pageWrapper } from "./constants";
 
 export function toggleScrollLock(isLocked: boolean): void {
